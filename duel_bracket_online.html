@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DUEL BRACKET ONLINE</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{color-scheme:dark;--bg:#0b0d12;--panel:#141923;--line:#30394a;--gold:#d8ad55;--muted:#9aa5b5;--text:#f3f5f8;--green:#65c995;--red:#ed8585}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#18202c 0,#0b0d12 55%);color:var(--text);font:15px/1.5 system-ui,"Segoe UI",sans-serif}
+header{padding:20px clamp(16px,4vw,48px);border-bottom:1px solid #293141;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{font-weight:900;letter-spacing:.14em;font-size:19px}.brand span{color:var(--gold)}.sub{color:var(--muted);font-size:11px;letter-spacing:.18em}
+main{max-width:1500px;margin:auto;padding:24px clamp(14px,3vw,36px) 60px}h1{font-size:clamp(24px,4vw,36px);margin:0 0 4px}.lead{color:var(--muted);margin:0 0 22px}
+.layout{display:grid;grid-template-columns:minmax(280px,350px) 1fr;gap:18px;align-items:start}.panel{background:linear-gradient(145deg,#171e29,#111620);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 12px 32px #0003}
+.panel h2{font-size:14px;letter-spacing:.08em;margin:0 0 14px;color:var(--gold)}label{display:block;font-size:12px;color:var(--muted);margin:13px 0 6px}
+input,textarea,select{width:100%;background:#0c1119;border:1px solid #354052;border-radius:9px;padding:11px;color:var(--text);font:inherit}textarea{min-height:150px;resize:vertical}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1}button,.filebtn{border:1px solid #485367;background:#202938;color:var(--text);border-radius:9px;padding:10px 13px;font-weight:650;cursor:pointer;font:inherit}button:hover{border-color:var(--gold);background:#2a3444}
+.primary{background:linear-gradient(135deg,#d9b35f,#a97b2d);border:0;color:#17130b}.danger{color:#ffaaaa}.small{font-size:12px;padding:7px 10px}.muted,.hint{color:var(--muted)}.hint{font-size:11px;margin-top:7px}
+.notice{padding:10px 12px;border-radius:9px;background:#1c2b25;color:#a9e8c4;font-size:12px;margin:12px 0}.error{background:#321e22;color:#ffb5b5}.hidden{display:none!important}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}.stat{background:#0d131d;border:1px solid #2c3545;border-radius:10px;padding:10px}.stat b{display:block;font-size:22px;color:var(--gold)}.stat span{font-size:11px;color:var(--muted)}
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px}.bracket-wrap{overflow:auto;padding:5px 2px 18px;min-height:260px}.bracket{display:flex;gap:24px;align-items:stretch;width:max-content;min-width:100%}
+.round{width:218px;display:flex;flex-direction:column;gap:12px}.round h3{font-size:12px;color:var(--gold);letter-spacing:.08em;margin:0 0 3px}
+.match{background:#101722;border:1px solid #344052;border-radius:11px;padding:9px;display:flex;flex-direction:column;gap:6px}.player{display:flex;align-items:center;gap:5px;min-height:31px;background:#1a2330;border-radius:7px;padding:5px 7px;font-size:12px}.player.winner{border:1px solid #4e9b76;background:#14271f;color:#b5f0d0}.player.empty{color:#647083;font-style:italic}.player button{margin-left:auto;padding:3px 7px;font-size:10px;flex:none}.matchmeta{display:flex;justify-content:space-between;color:#748094;font-size:10px}
+.champ{border:1px solid #8b6b32;background:linear-gradient(145deg,#2a2418,#151922);padding:18px;border-radius:13px;text-align:center;margin-top:15px}.champ strong{display:block;font-size:24px;color:var(--gold)}
+.authbox{max-width:520px;margin:0 0 18px}.status{font-size:12px;color:var(--muted);margin-top:8px;overflow-wrap:anywhere}.share{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.share input{min-width:200px}.hidden{display:none!important}
+footer{text-align:center;color:#6f7a8b;font-size:11px;padding:22px}@media(max-width:850px){.layout{grid-template-columns:1fr}}
+@media print{body{background:#fff;color:#111}.no-print,header,.lead{display:none!important}main{max-width:none;padding:0}.panel{background:#fff;color:#111;box-shadow:none;border:0}.bracket-wrap{overflow:visible}.round h3{color:#805c18}.match{background:#fff;border-color:#aaa;break-inside:avoid}.player{background:#f3f3f3;color:#111}.player.winner{background:#e5f5eb;color:#145b32}}
+</style></head>
+<body>
+<header><div><div class="brand">DUEL <span>BRACKET</span></div><div class="sub">TOURNAMENT MANAGEMENT · ONLINE</div></div><div class="sub">SINGLE ELIMINATION</div></header>
+<main>
+<h1>大会トーナメント管理</h1><p class="lead">大会作成・勝敗管理・参加者向けリアルタイム公開。</p>
+<section class="panel authbox no-print" id="setupPanel">
+<h2>00 / オンライン接続設定</h2>
+<p class="hint">SupabaseのProject URLとPublishable keyを入力してください。Secret key / service_role keyは絶対に入力しないでください。</p>
+<label>Supabase Project URL</label><input id="supabaseUrl" value="https://philljylwxmjbibbmzqm.supabase.co" placeholder="https://xxxx.supabase.co">
+<label>Supabase Publishable key</label><input id="supabaseKey" placeholder="sb_publishable_...">
+<div class="row" style="margin-top:10px"><button class="primary" id="connectBtn">接続する</button><button id="forgetConfigBtn">この端末の接続設定を消去</button></div>
+<div class="status" id="connectionStatus">未接続</div>
+</section>
+<section class="panel authbox no-print hidden" id="authPanel">
+<h2>主催者ログイン</h2>
+<label>メールアドレス</label><input id="email" type="email" autocomplete="email" placeholder="you@example.com">
+<label>パスワード</label><input id="password" type="password" autocomplete="current-password" placeholder="6文字以上">
+<div class="row" style="margin-top:12px"><button class="primary" id="signInBtn">ログイン</button><button id="signUpBtn">新規登録</button><button id="signOutBtn" class="hidden">ログアウト</button></div>
+<div class="status" id="authStatus">大会を作成するには主催者ログインが必要です。閲覧URLからはログインなしで大会を見られます。</div>
+</section>
+<div class="layout">
+<section class="panel no-print" id="managePanel">
+<h2>01 / 大会設定</h2>
+<label>大会名</label><input id="eventName" value="DUEL MASTERS CS" maxlength="80">
+<label>参加者リスト（1行に1名）</label><textarea id="names" placeholder="プレイヤー名を1行ずつ入力"></textarea>
+<div class="row"><button id="sampleBtn">サンプル8人</button><button id="csvBtn">CSV / テキスト読込</button></div><input id="fileInput" type="file" accept=".csv,.txt,text/csv,text/plain" class="hidden">
+<label>組み合わせ</label><select id="seedMode"><option value="random">ランダム</option><option value="order">入力順</option></select>
+<div class="row" style="margin-top:14px"><button class="primary" id="createBtn">オンライン大会を作成</button><button id="loadMineBtn">自分の大会を再読込</button></div>
+<p class="hint">最大128人。大会を作成すると閲覧用URLが発行されます。</p>
+<div class="notice">勝敗・大会情報はSupabaseに保存され、閲覧者の画面にも反映されます。</div>
+<hr style="border:0;border-top:1px solid #30394a;margin:18px 0">
+<h2>02 / 大会共有</h2><div class="share"><input id="shareUrl" readonly placeholder="大会作成後にURLが表示されます"><button id="copyUrlBtn">URLコピー</button></div>
+<div class="hint">このURLを参加者に共有してください。閲覧専用です。</div>
+<div class="row" style="margin-top:12px"><button id="printBtn">印刷 / PDF保存</button></div>
+</section>
+<section class="panel">
+<div class="toolbar"><div><h2 style="margin:0">03 / BRACKET</h2><div id="eventLabel" class="muted" style="font-size:12px">大会を作成してください</div></div><button class="small no-print" id="undoBtn">直前の結果を取消</button></div>
+<div id="message" class="notice hidden"></div>
+<div id="stats" class="stats hidden"><div class="stat"><b id="playersStat">0</b><span>参加者</span></div><div class="stat"><b id="matchesStat">0</b><span>試合数</span></div><div class="stat"><b id="doneStat">0</b><span>確定試合</span></div></div>
+<div id="empty" class="muted" style="padding:65px 10px;text-align:center">大会を作成するか、共有URLでアクセスしてください。</div>
+<div id="bracketWrap" class="bracket-wrap hidden"><div id="bracket" class="bracket"></div></div>
+<div id="champion" class="champ hidden"><div class="sub">TOURNAMENT CHAMPION</div><strong id="champName"></strong><span class="muted">優勝おめでとう！</span></div>
+</section></div></main><footer>DUEL BRACKET · Powered by Supabase</footer>
+<script>
+const $=id=>document.getElementById(id);
+let sb=null,user=null,tournamentId=null,state=null,history=[],isOwner=false,channel=null;
+const CONFIG_KEY='duel-bracket-supabase-config';
+function message(t,bad=false){$('message').textContent=t;$('message').classList.remove('hidden','error');if(bad)$('message').classList.add('error')}
+function parseNames(t){
+ return [...new Set(t.split(/[\r\n,，、\t]+/).map(x=>x.trim()).filter(Boolean))];
+}
+function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function localBuild(names,event){
+ let size=1;while(size<names.length)size*=2;let slots=Array(size).fill(null);names.forEach((n,i)=>slots[i]=n);
+ let rounds=[],count=size/2;rounds.push(Array.from({length:count},(_,i)=>({a:slots[i*2],b:slots[i*2+1],winner:null,bye:!slots[i*2]||!slots[i*2+1]})));
+ while(count>1){count/=2;rounds.push(Array.from({length:count},()=>({a:null,b:null,winner:null,bye:false})))}
+ return {event,players:names,rounds};
+}
+function propagate(){
+ for(let r=0;r<state.rounds.length-1;r++){
+  state.rounds[r].forEach((m,i)=>{
+   let d=state.rounds[r+1][Math.floor(i/2)];
+   if(i%2===0)d.a=m.winner;
+   else d.b=m.winner;
+  });
+  state.rounds[r+1].forEach(m=>{
+   if(m.a&&m.b){
+    m.winner=null;
+   }else{
+    m.winner=null;
+   }
+  });
+ }
+}
+function render(){
+ let exists=!!state;$('empty').classList.toggle('hidden',exists);$('bracketWrap').classList.toggle('hidden',!exists);$('stats').classList.toggle('hidden',!exists);$('champion').classList.add('hidden');
+ if(!exists){$('eventLabel').textContent='大会を作成してください';return}
+ $('eventLabel').textContent=state.event+' · '+state.players.length+'人'+(isOwner?' · 主催者モード':' · 閲覧モード');
+ $('playersStat').textContent=state.players.length;let total=state.rounds.reduce((n,r)=>n+r.length,0),done=state.rounds.reduce((n,r)=>n+r.filter(m=>m.winner&&m.a&&m.b).length,0);
+ $('matchesStat').textContent=total;$('doneStat').textContent=done;$('bracket').innerHTML='';
+ state.rounds.forEach((round,r)=>{let col=document.createElement('div');col.className='round';let h=document.createElement('h3');h.textContent=['1回戦','2回戦','3回戦','準決勝','決勝'][r]||`${r+1}回戦`;col.append(h);
+ round.forEach((m,i)=>{let card=document.createElement('div');card.className='match';let meta=document.createElement('div');meta.className='matchmeta';meta.innerHTML=`<span>GAME ${i+1}</span><span>${m.bye?'BYE':'SINGLE ELIMINATION'}</span>`;card.append(meta);
+ [m.a,m.b].forEach(p=>{let line=document.createElement('div');line.className='player'+(m.winner&&m.winner===p?' winner':'')+(!p?' empty':'');let label=document.createElement('span');label.textContent=p||(m.bye?'BYE':'対戦相手未定');line.append(label);
+ if(isOwner&&p&&m.a&&m.b&&!m.winner){let btn=document.createElement('button');btn.textContent='勝者';btn.onclick=()=>setWinner(r,i,p);line.append(btn)}card.append(line)});
+ if(m.winner){let win=document.createElement('div');win.className='matchmeta';win.style.color='#65c995';win.textContent='WINNER: '+m.winner;card.append(win)}col.append(card)});$('bracket').append(col)});
+ let f=state.rounds.at(-1)[0];if(f?.winner){$('champion').classList.remove('hidden');$('champName').textContent=f.winner}
+}
+async function persistMatches(){
+ if(!sb||!tournamentId||!isOwner)return;
+ for(let r=0;r<state.rounds.length;r++)for(let i=0;i<state.rounds[r].length;i++){
+  let m=state.rounds[r][i],row={tournament_id:tournamentId,round_number:r+1,match_number:i+1,player1_id:m.a?state.nameToId[m.a]:null,player2_id:m.b?state.nameToId[m.b]:null,winner_id:m.winner?state.nameToId[m.winner]:null,table_number:null,status:m.winner?'completed':'pending'};
+  const {error}=await sb.from('matches').upsert(row,{onConflict:'tournament_id,round_number,match_number'});
+  if(error)throw error;
+ }
+}
+
+async function setWinner(r,i,name){
+ if(!isOwner)return;
+ history.push(JSON.stringify(state));
+ if(history.length>20)history.shift();
+
+ let m=state.rounds[r][i];
+ m.winner=name;
+
+ // 後続ラウンドを再計算
+ for(let rr=r+1;rr<state.rounds.length;rr++){
+  state.rounds[rr].forEach(x=>{
+   x.a=null;
+   x.b=null;
+   x.winner=null;
+  });
+ }
+
+ for(let rr=r;rr<state.rounds.length-1;rr++){
+  state.rounds[rr].forEach((src,idx)=>{
+   let dest=state.rounds[rr+1][Math.floor(idx/2)];
+   if(idx%2===0)dest.a=src.winner;
+   else dest.b=src.winner;
+  });
+ }
+
+ render();
+ try{
+  await persistMatches();
+  await refreshTournament();
+ }catch(e){
+  message('勝敗の保存に失敗: '+e.message,true);
+ }
+}
+async function refreshTournament(){
+ if(!sb||!tournamentId)return;
+ const {data:t,error:te}=await sb.from('tournaments').select('*').eq('id',tournamentId).single();if(te)throw te;
+ const {data:ps,error:pe}=await sb.from('participants').select('*').eq('tournament_id',tournamentId).order('seed');if(pe)throw pe;
+ const {data:ms,error:me}=await sb.from('matches').select('*').eq('tournament_id',tournamentId).order('round_number').order('match_number');if(me)throw me;
+ const idToName={};ps.forEach(p=>idToName[p.id]=p.name);
+ let names=ps.map(p=>p.name),built=localBuild(names,t.name);built.nameToId=Object.fromEntries(ps.map(p=>[p.name,p.id]));
+ ms.forEach(x=>{let m=built.rounds[x.round_number-1]?.[x.match_number-1];if(m){m.a=idToName[x.player1_id]||null;m.b=idToName[x.player2_id]||null;m.winner=idToName[x.winner_id]||null}});
+ // Keep database results authoritative; reconstruct progression when no match row exists.
+ state=built;history=[];isOwner=!!user&&user.id===t.owner_id;render();
+ $('eventName').value=t.name;$('shareUrl').value=location.origin+location.pathname+'?t='+tournamentId;
+ $('managePanel').classList.toggle('hidden',!isOwner);$('undoBtn').classList.toggle('hidden',!isOwner);
+}
+async function createOnline(){
+ if(!sb||!user)return message('先に接続して主催者ログインしてください。',true);
+ let names=parseNames($('names').value);if(names.length<2||names.length>128)return message('参加者は2〜128人で入力してください。',true);
+ if($('seedMode').value==='random')names=shuffle(names);let event=$('eventName').value.trim()||'大会';
+ try{
+  const {data:t,error}=await sb.from('tournaments').insert({owner_id:user.id,name:event,is_public:true}).select().single();if(error)throw error;tournamentId=t.id;
+  const people=names.map((name,i)=>({tournament_id:t.id,name,seed:i+1}));
+  const {data:ps,error:pe}=await sb.from('participants').insert(people).select();if(pe)throw pe;
+  const built=localBuild(names,event);built.nameToId=Object.fromEntries(ps.map(p=>[p.name,p.id]));
+  // Resolve automatic BYEs before writing all match rows.
+  built.rounds[0].forEach(m=>{if(m.a&&!m.b)m.winner=m.a;else if(!m.a&&m.b)m.winner=m.b});state=built;propagate();state=built;
+  isOwner=true;await persistMatches();await refreshTournament();subscribe();message('オンライン大会を作成しました！閲覧URLを共有できます。');
+ }catch(e){message('作成に失敗: '+e.message,true)}
+}
+function subscribe(){if(channel)sb.removeChannel(channel);channel=sb.channel('tournament-'+tournamentId).on('postgres_changes',{event:'*',schema:'public',table:'matches',filter:'tournament_id=eq.'+tournamentId},()=>refreshTournament().catch(e=>message(e.message,true))).on('postgres_changes',{event:'*',schema:'public',table:'participants',filter:'tournament_id=eq.'+tournamentId},()=>refreshTournament().catch(e=>message(e.message,true))).on('postgres_changes',{event:'*',schema:'public',table:'tournaments',filter:'id=eq.'+tournamentId},()=>refreshTournament().catch(e=>message(e.message,true))).subscribe()}
+async function connect(){
+ let url=$('supabaseUrl').value.trim(),key=$('supabaseKey').value.trim();if(!url||!key)return $('connectionStatus').textContent='URLとPublishable keyを入力してください';
+ localStorage.setItem(CONFIG_KEY,JSON.stringify({url,key}));sb=window.supabase.createClient(url,key);
+ $('connectionStatus').textContent='Supabaseに接続しました';$('authPanel').classList.remove('hidden');
+ const {data:{session}}=await sb.auth.getSession();user=session?.user||null;updateAuth();
+ sb.auth.onAuthStateChange((_event,session)=>{user=session?.user||null;updateAuth()});
+ let id=new URLSearchParams(location.search).get('t');if(id){tournamentId=id;try{await refreshTournament();subscribe()}catch(e){message('大会を読み込めません: '+e.message,true)}}
+}
+function updateAuth(){$('authStatus').textContent=user?'ログイン中: '+user.email:'大会を作成するにはログインしてください。';$('signOutBtn').classList.toggle('hidden',!user);$('createBtn').disabled=!user}
+async function auth(signup){let email=$('email').value.trim(),password=$('password').value;if(!email||password.length<6)return $('authStatus').textContent='メールアドレスと6文字以上のパスワードを入力してください。';let res=signup?await sb.auth.signUp({email,password}):await sb.auth.signInWithPassword({email,password});$('authStatus').textContent=res.error?res.error.message:(signup?'確認メールが届いたら認証してください。':'ログインしました。');}
+$('connectBtn').onclick=connect;$('forgetConfigBtn').onclick=()=>{localStorage.removeItem(CONFIG_KEY);$('supabaseKey').value='';$('connectionStatus').textContent='接続設定を消去しました'};
+$('signInBtn').onclick=()=>auth(false);$('signUpBtn').onclick=()=>auth(true);$('signOutBtn').onclick=()=>sb.auth.signOut();
+$('createBtn').onclick=createOnline;$('loadMineBtn').onclick=async()=>{if(!user)return message('先にログインしてください',true);let {data,error}=await sb.from('tournaments').select('id,name').eq('owner_id',user.id).order('created_at',{ascending:false}).limit(1).maybeSingle();if(error||!data)return message('大会が見つかりません',true);tournamentId=data.id;await refreshTournament();subscribe()};
+$('sampleBtn').onclick=()=>$('names').value=['青木','石井','上田','遠藤','大野','加藤','木村','斎藤'].join('\n');
+$('csvBtn').onclick=()=>$('fileInput').click();$('fileInput').onchange=async e=>{let f=e.target.files[0];if(f){$('names').value=(await f.text()).replace(/^\\uFEFF/,'').split(/\\r?\\n/).map(x=>x.split(',')[0].replace(/^"|"$/g,'')).join('\\n');e.target.value=''}};
+$('printBtn').onclick=()=>window.print();$('copyUrlBtn').onclick=async()=>{if(!$('shareUrl').value)return;await navigator.clipboard.writeText($('shareUrl').value);message('閲覧URLをコピーしました')};
+$('undoBtn').onclick=async()=>{if(!history.length)return message('取り消せる結果がありません');state=JSON.parse(history.pop());render();try{await persistMatches()}catch(e){message(e.message,true)}};
+try{let c=JSON.parse(localStorage.getItem(CONFIG_KEY)||'null');if(c){$('supabaseUrl').value=c.url;$('supabaseKey').value=c.key;connect()}}catch(e){}
+</script></body></html>
