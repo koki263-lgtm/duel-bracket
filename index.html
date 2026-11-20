@@ -303,6 +303,20 @@ async function refreshTournament(){
  }
 });
  // Keep database results authoritative; reconstruct progression when no match row exists.
+  // 前の試合の勝者を次の試合に反映
+for(let r=0;r<built.rounds.length-1;r++){
+ built.rounds[r].forEach((m,i)=>{
+  const next=built.rounds[r+1][Math.floor(i/2)];
+
+  if(!next)return;
+
+  if(i%2===0){
+   next.a=m.winner||null;
+  }else{
+   next.b=m.winner||null;
+  }
+ });
+}
  state=built;history=[];isOwner=!!user&&user.id===t.owner_id;render();
 $('eventName').value=t.name;
 const shareUrl=location.origin+location.pathname+'?t='+tournamentId;
