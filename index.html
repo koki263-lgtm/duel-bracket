@@ -69,6 +69,17 @@ footer{text-align:center;color:#6f7a8b;font-size:11px;padding:22px}@media(max-wi
 </section></div></main><footer>DUEL BRACKET · Powered by Supabase</footer>
 <script>
 const $=id=>document.getElementById(id);
+ const SUPABASE_URL='https://philljylwxmjbibbmzqm.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY=sb_publishable_IX7Nq4ckpYIaIkSUNfeFOg_xY3G7FVW;
+const IS_SHARED_VIEW=new URLSearchParams(location.search).has('t');
+ function applyViewMode(){
+ if(IS_SHARED_VIEW){
+  $('setupPanel').classList.add('hidden');
+  $('authPanel').classList.add('hidden');
+  $('managePanel').classList.add('hidden');
+  $('undoBtn').classList.add('hidden');
+ }
+}
 let sb=null,user=null,tournamentId=null,state=null,history=[],isOwner=false,channel=null;
 const CONFIG_KEY='duel-bracket-supabase-config';
 function message(t,bad=false){$('message').textContent=t;$('message').classList.remove('hidden','error');if(bad)$('message').classList.add('error')}
@@ -182,12 +193,41 @@ async function createOnline(){
 }
 function subscribe(){if(channel)sb.removeChannel(channel);channel=sb.channel('tournament-'+tournamentId).on('postgres_changes',{event:'*',schema:'public',table:'matches',filter:'tournament_id=eq.'+tournamentId},()=>refreshTournament().catch(e=>message(e.message,true))).on('postgres_changes',{event:'*',schema:'public',table:'participants',filter:'tournament_id=eq.'+tournamentId},()=>refreshTournament().catch(e=>message(e.message,true))).on('postgres_changes',{event:'*',schema:'public',table:'tournaments',filter:'id=eq.'+tournamentId},()=>refreshTournament().catch(e=>message(e.message,true))).subscribe()}
 async function connect(){
- let url=$('supabaseUrl').value.trim(),key=$('supabaseKey').value.trim();if(!url||!key)return $('connectionStatus').textContent='URLとPublishable keyを入力してください';
- localStorage.setItem(CONFIG_KEY,JSON.stringify({url,key}));sb=window.supabase.createClient(url,key);
- $('connectionStatus').textContent='Supabaseに接続しました';$('authPanel').classList.remove('hidden');
- const {data:{session}}=await sb.auth.getSession();user=session?.user||null;updateAuth();
- sb.auth.onAuthStateChange((_event,session)=>{user=session?.user||null;updateAuth()});
- let id=new URLSearchParams(location.search).get('t');if(id){tournamentId=id;try{await refreshTournament();subscribe()}catch(e){message('大会を読み込めません: '+e.message,true)}}
+ const url=SUPABASE_URL;
+ const key=SUPABASE_PUBLISHABLE_KEY;
+
+ if(!key || key==='ここにコピーしたキーを貼る'){
+  $('connectionStatus').textContent='Publishable keyを設定してください';
+  return;
+ }
+
+ sb=window.supabase.createClient(url,key);
+ $('connectionStatus').textContent='Supabaseに接続しました';
+
+ if(!IS_SHARED_VIEW){
+  $('authPanel').classList.remove('hidden');
+ }
+
+ const {data:{session}}=await sb.auth.getSession();
+ user=session?.user||null;
+ updateAuth();
+
+ sb.auth.onAuthStateChange((_event,session)=>{
+  user=session?.user||null;
+  updateAuth();
+ });
+
+ let id=new URLSearchParams(location.search).get('t');
+
+ if(id){
+  tournamentId=id;
+  try{
+   await refreshTournament();
+   subscribe();
+  }catch(e){
+   message('大会を読み込めません: '+e.message,true);
+  }
+ }
 }
 function updateAuth(){$('authStatus').textContent=user?'ログイン中: '+user.email:'大会を作成するにはログインしてください。';$('signOutBtn').classList.toggle('hidden',!user);$('createBtn').disabled=!user}
 async function auth(signup){let email=$('email').value.trim(),password=$('password').value;if(!email||password.length<6)return $('authStatus').textContent='メールアドレスと6文字以上のパスワードを入力してください。';let res=signup?await sb.auth.signUp({email,password}):await sb.auth.signInWithPassword({email,password});$('authStatus').textContent=res.error?res.error.message:(signup?'確認メールが届いたら認証してください。':'ログインしました。');}
@@ -198,5 +238,9 @@ $('sampleBtn').onclick=()=>$('names').value=['青木','石井','上田','遠藤'
 $('csvBtn').onclick=()=>$('fileInput').click();$('fileInput').onchange=async e=>{let f=e.target.files[0];if(f){$('names').value=(await f.text()).replace(/^\\uFEFF/,'').split(/\\r?\\n/).map(x=>x.split(',')[0].replace(/^"|"$/g,'')).join('\\n');e.target.value=''}};
 $('printBtn').onclick=()=>window.print();$('copyUrlBtn').onclick=async()=>{if(!$('shareUrl').value)return;await navigator.clipboard.writeText($('shareUrl').value);message('閲覧URLをコピーしました')};
 $('undoBtn').onclick=async()=>{if(!history.length)return message('取り消せる結果がありません');state=JSON.parse(history.pop());render();try{await persistMatches()}catch(e){message(e.message,true)}};
-try{let c=JSON.parse(localStorage.getItem(CONFIG_KEY)||'null');if(c){$('supabaseUrl').value=c.url;$('supabaseKey').value=c.key;connect()}}catch(e){}
+applyViewMode();
+
+connect().catch(e=>{
+ message('接続に失敗: '+e.message,true);
+});
 </script></body></html>
