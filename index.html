@@ -253,32 +253,6 @@ async function persistMatches(){
  }
 }
 
- // 試合結果とテーブル番号を保存
- for(let r=0;r<state.rounds.length;r++){
-  for(let i=0;i<state.rounds[r].length;i++){
-   let m=state.rounds[r][i];
-
-   let row={
-    tournament_id:tournamentId,
-    round_number:r+1,
-    match_number:i+1,
-    player1_id:m.a?state.nameToId[m.a]:null,
-    player2_id:m.b?state.nameToId[m.b]:null,
-    winner_id:m.winner?state.nameToId[m.winner]:null,
-    table_number:assignments[`${r}-${i}`]||null,
-    status:m.winner?'completed':'pending'
-   };
-
-   const {error}=await sb.from('matches')
-    .upsert(row,{
-     onConflict:'tournament_id,round_number,match_number'
-    });
-
-   if(error)throw error;
-  }
- }
-}
-
 async function setWinner(r,i,name){
  if(!isOwner)return;
  history.push(JSON.stringify(state));
