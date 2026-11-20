@@ -172,7 +172,21 @@ function render(){
  $('playersStat').textContent=state.players.length;let total=state.rounds.reduce((n,r)=>n+r.length,0),done=state.rounds.reduce((n,r)=>n+r.filter(m=>m.winner&&m.a&&m.b).length,0);
  $('matchesStat').textContent=total;$('doneStat').textContent=done;$('bracket').innerHTML='';
  state.rounds.forEach((round,r)=>{let col=document.createElement('div');col.className='round';let h=document.createElement('h3');h.textContent=['1回戦','2回戦','3回戦','準決勝','決勝'][r]||`${r+1}回戦`;col.append(h);
- round.forEach((m,i)=>{let card=document.createElement('div');card.className='match';let meta=document.createElement('div');meta.className='matchmeta';meta.innerHTML=`<span>GAME ${i+1}</span><span>${m.bye?'BYE':'SINGLE ELIMINATION'}</span>`;card.append(meta);
+ round.forEach((m,i)=>{let card=document.createElement('div');card.className='match';let meta=document.createElement('div');meta.className='matchmeta';meta.innerHTML=`
+ <span>GAME ${i+1}</span>
+ <span>${m.bye?'BYE':'SINGLE ELIMINATION'}</span>
+`;
+card.append(meta);
+
+if(m.table_number){
+ let table=document.createElement('div');
+ table.className='matchmeta';
+ table.style.color='#65c995';
+ table.style.fontWeight='bold';
+ table.style.fontSize='14px';
+ table.textContent='TABLE '+String(m.table_number).padStart(2,'0');
+ card.append(table);
+}
  [m.a,m.b].forEach(p=>{let line=document.createElement('div');line.className='player'+(m.winner&&m.winner===p?' winner':'')+(!p?' empty':'');let label=document.createElement('span');label.textContent=p||(m.bye?'BYE':'対戦相手未定');line.append(label);
  if(isOwner&&p&&m.a&&m.b&&!m.winner){let btn=document.createElement('button');btn.textContent='勝者';btn.onclick=()=>setWinner(r,i,p);line.append(btn)}card.append(line)});
  if(m.winner){let win=document.createElement('div');win.className='matchmeta';win.style.color='#65c995';win.textContent='WINNER: '+m.winner;card.append(win)}col.append(card)});$('bracket').append(col)});
@@ -180,10 +194,88 @@ function render(){
 }
 async function persistMatches(){
  if(!sb||!tournamentId||!isOwner)return;
- for(let r=0;r<state.rounds.length;r++)for(let i=0;i<state.rounds[r].length;i++){
-  let m=state.rounds[r][i],row={tournament_id:tournamentId,round_number:r+1,match_number:i+1,player1_id:m.a?state.nameToId[m.a]:null,player2_id:m.b?state.nameToId[m.b]:null,winner_id:m.winner?state.nameToId[m.winner]:null,table_number:null,status:m.winner?'completed':'pending'};
-  const {error}=await sb.from('matches').upsert(row,{onConflict:'tournament_id,round_number,match_number'});
-  if(error)throw error;
+
+ const used=new Set();
+
+ // 試合中のテーブル番号を維持する
+ for(const round of state.rounds){
+  for(const m of round){
+   if(m.a&&m.b&&!m.winner&&
+      Number.isInteger(m.table_number)&&
+      m.table_number>=1&&m.table_number<=32){
+    used.add(m.table_number);
+   }
+  }
+ }
+
+ // 新しい試合に空いているテーブルを割り当てる
+ for(const round of state.rounds){
+  for(const m of round){
+   if(m.a&&m.b&&!m.winner&&!m.table_number){
+    for(let n=1;n<=32;n++){
+     if(!used.has(n)){
+      m.table_number=n;
+      used.add(n);
+      break;
+     }
+    }
+   }
+
+   if(!m.a||!m.b||m.winner){
+    m.table_number=null;
+   }
+  }
+ }
+
+ // データベースに保存
+ for(let r=0;r<state.rounds.length;r++){
+  for(let i=0;i<state.rounds[r].length;i++){
+   const m=state.rounds[r][i];
+
+   const row={
+    tournament_id:tournamentId,
+    round_number:r+1,
+    match_number:i+1,
+    player1_id:m.a?state.nameToId[m.a]:null,
+    player2_id:m.b?state.nameToId[m.b]:null,
+    winner_id:m.winner?state.nameToId[m.winner]:null,
+    table_number:m.table_number||null,
+    status:m.winner?'completed':'pending'
+   };
+
+   const {error}=await sb.from('matches')
+    .upsert(row,{
+     onConflict:'tournament_id,round_number,match_number'
+    });
+
+   if(error)throw error;
+  }
+ }
+}
+
+ // 試合結果とテーブル番号を保存
+ for(let r=0;r<state.rounds.length;r++){
+  for(let i=0;i<state.rounds[r].length;i++){
+   let m=state.rounds[r][i];
+
+   let row={
+    tournament_id:tournamentId,
+    round_number:r+1,
+    match_number:i+1,
+    player1_id:m.a?state.nameToId[m.a]:null,
+    player2_id:m.b?state.nameToId[m.b]:null,
+    winner_id:m.winner?state.nameToId[m.winner]:null,
+    table_number:assignments[`${r}-${i}`]||null,
+    status:m.winner?'completed':'pending'
+   };
+
+   const {error}=await sb.from('matches')
+    .upsert(row,{
+     onConflict:'tournament_id,round_number,match_number'
+    });
+
+   if(error)throw error;
+  }
  }
 }
 
@@ -227,7 +319,15 @@ async function refreshTournament(){
  const {data:ms,error:me}=await sb.from('matches').select('*').eq('tournament_id',tournamentId).order('round_number').order('match_number');if(me)throw me;
  const idToName={};ps.forEach(p=>idToName[p.id]=p.name);
  let names=ps.map(p=>p.name),built=localBuild(names,t.name);built.nameToId=Object.fromEntries(ps.map(p=>[p.name,p.id]));
- ms.forEach(x=>{let m=built.rounds[x.round_number-1]?.[x.match_number-1];if(m){m.a=idToName[x.player1_id]||null;m.b=idToName[x.player2_id]||null;m.winner=idToName[x.winner_id]||null}});
+ ms.forEach(x=>{
+ let m=built.rounds[x.round_number-1]?.[x.match_number-1];
+ if(m){
+  m.a=idToName[x.player1_id]||null;
+  m.b=idToName[x.player2_id]||null;
+  m.winner=idToName[x.winner_id]||null;
+  m.table_number=x.table_number;
+ }
+});
  // Keep database results authoritative; reconstruct progression when no match row exists.
  state=built;history=[];isOwner=!!user&&user.id===t.owner_id;render();
 $('eventName').value=t.name;
