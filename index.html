@@ -248,14 +248,21 @@ function render(){
  win.textContent='WINNER: '+m.winner;
  card.append(win);
 
- if(isOwner){
+if(isOwner){
   let undo=document.createElement('button');
   undo.textContent='結果を取り消す';
   undo.onclick=()=>undoMatchResult(r,i);
   card.append(undo);
  }
 }
-    win.className='matchmeta';
+
+if(m.winner){
+ let win=document.createElement('div');
+ win.className='matchmeta';
+ win.style.color='#65c995';
+ win.textContent='WINNER: '+m.winner;
+ card.append(win);
+}
     win.style.color='#65c995';
     win.textContent='WINNER: '+m.winner;
     card.append(win);
