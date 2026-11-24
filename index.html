@@ -165,45 +165,103 @@ function propagate(){
   });
  }
 }
-function render(){
- let exists=!!state;$('empty').classList.toggle('hidden',exists);$('bracketWrap').classList.toggle('hidden',!exists);$('stats').classList.toggle('hidden',!exists);$('champion').classList.add('hidden');
- if(!exists){$('eventLabel').textContent='大会を作成してください';return}
- $('eventLabel').textContent=state.event+' · '+state.players.length+'人'+(isOwner?' · 主催者モード':' · 閲覧モード');
- $('playersStat').textContent=state.players.length;let total=state.rounds.reduce((n,r)=>n+r.length,0),done=state.rounds.reduce((n,r)=>n+r.filter(m=>m.winner&&m.a&&m.b).length,0);
- $('matchesStat').textContent=total;$('doneStat').textContent=done;$('bracket').innerHTML='';
- state.rounds.forEach((round,r)=>{let col=document.createElement('div');col.className='round';let h=document.createElement('h3');h.textContent=['1回戦','2回戦','3回戦','準決勝','決勝'][r]||`${r+1}回戦`;col.append(h);
- round.forEach((m,i)=>{let card=document.createElement('div');card.className='match';let meta=document.createElement('div');meta.className='matchmeta';meta.innerHTML=`
- <span>GAME ${i+1}</span>
- <span>${m.bye?'BYE':'SINGLE ELIMINATION'}</span>
-`;
-card.append(meta);
 
-if(m.table_number){
- let table=document.createElement('div');
- table.className='matchmeta';
- table.style.color='#65c995';
- table.style.fontWeight='bold';
- table.style.fontSize='14px';
- table.textContent='TABLE '+String(m.table_number).padStart(2,'0');
- card.append(table);
+function render(){
+ let exists=!!state;
+ $('empty').classList.toggle('hidden',exists);
+ $('bracketWrap').classList.toggle('hidden',!exists);
+ $('stats').classList.toggle('hidden',!exists);
+ $('champion').classList.add('hidden');
+
+ if(!exists){
+  $('eventLabel').textContent='大会を作成してください';
+  return;
+ }
+
+ $('eventLabel').textContent=state.event+' · '+state.players.length+'人'+(isOwner?' · 主催者モード':' · 閲覧モード');
+ $('playersStat').textContent=state.players.length;
+
+ let total=state.rounds.reduce((n,r)=>n+r.length,0);
+ let done=state.rounds.reduce((n,r)=>n+r.filter(m=>m.winner&&m.a&&m.b).length,0);
+
+ $('matchesStat').textContent=total;
+ $('doneStat').textContent=done;
+ $('bracket').innerHTML='';
+
+ state.rounds.forEach((round,r)=>{
+  let col=document.createElement('div');
+  col.className='round';
+
+  let h=document.createElement('h3');
+  h.textContent=['1回戦','2回戦','3回戦','準決勝','決勝'][r]||`${r+1}回戦`;
+  col.append(h);
+
+  round.forEach((m,i)=>{
+   let card=document.createElement('div');
+   card.className='match';
+
+   let meta=document.createElement('div');
+   meta.className='matchmeta';
+   meta.innerHTML=`
+    <span>GAME ${i+1}</span>
+    <span>${m.bye?'BYE':'SINGLE ELIMINATION'}</span>
+   `;
+   card.append(meta);
+
+   if(m.table_number){
+    let table=document.createElement('div');
+    table.className='matchmeta';
+    table.style.color='#65c995';
+    table.style.fontWeight='bold';
+    table.style.fontSize='14px';
+    table.textContent='TABLE '+String(m.table_number).padStart(2,'0');
+    card.append(table);
+   }
+
+   [m.a,m.b].forEach(p=>{
+    let line=document.createElement('div');
+    line.className='player'+(m.winner&&m.winner===p?' winner':'')+(!p?' empty':'');
+    let label=document.createElement('span');
+    label.textContent=p||(m.bye?'BYE':'対戦相手未定');
+    line.append(label);
+
+    if(p&&m.a&&m.b&&!m.winner){
+     let btn=document.createElement('button');
+     btn.textContent='勝者';
+     btn.onclick=()=>{
+      if(isOwner){
+       setWinner(r,i,p);
+      }else{
+       reportMatchWinner(r,i,p);
+      }
+     };
+     line.append(btn);
+    }
+
+    card.append(line);
+   });
+
+   if(m.winner){
+    let win=document.createElement('div');
+    win.className='matchmeta';
+    win.style.color='#65c995';
+    win.textContent='WINNER: '+m.winner;
+    card.append(win);
+   }
+
+   col.append(card);
+  });
+
+  $('bracket').append(col);
+ });
+
+ let f=state.rounds.at(-1)[0];
+ if(f?.winner){
+  $('champion').classList.remove('hidden');
+  $('champName').textContent=f.winner;
+ }
 }
- [m.a,m.b].forEach(p=>{let line=document.createElement('div');line.className='player'+(m.winner&&m.winner===p?' winner':'')+(!p?' empty':'');let label=document.createElement('span');label.textContent=p||(m.bye?'BYE':'対戦相手未定');line.append(label);
-if(p&&m.a&&m.b&&!m.winner){
- let btn=document.createElement('button');
- btn.textContent='勝者';
- btn.onclick=()=>{
-  if(isOwner){
-   setWinner(r,i,p);
-  }else{
-   reportMatchWinner(r,i,p);
-  }
- };
- line.append(btn);
-}
-card.append(line);
- if(m.winner){let win=document.createElement('div');win.className='matchmeta';win.style.color='#65c995';win.textContent='WINNER: '+m.winner;card.append(win)}col.append(card)});$('bracket').append(col)});
- let f=state.rounds.at(-1)[0];if(f?.winner){$('champion').classList.remove('hidden');$('champName').textContent=f.winner}
-}
+
 async function persistMatches(){
  if(!sb||!tournamentId||!isOwner)return;
 
