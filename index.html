@@ -188,7 +188,19 @@ if(m.table_number){
  card.append(table);
 }
  [m.a,m.b].forEach(p=>{let line=document.createElement('div');line.className='player'+(m.winner&&m.winner===p?' winner':'')+(!p?' empty':'');let label=document.createElement('span');label.textContent=p||(m.bye?'BYE':'対戦相手未定');line.append(label);
- if(isOwner&&p&&m.a&&m.b&&!m.winner){let btn=document.createElement('button');btn.textContent='勝者';btn.onclick=()=>setWinner(r,i,p);line.append(btn)}card.append(line)});
+if(p&&m.a&&m.b&&!m.winner){
+ let btn=document.createElement('button');
+ btn.textContent='勝者';
+ btn.onclick=()=>{
+  if(isOwner){
+   setWinner(r,i,p);
+  }else{
+   reportMatchWinner(r,i,p);
+  }
+ };
+ line.append(btn);
+}
+card.append(line);
  if(m.winner){let win=document.createElement('div');win.className='matchmeta';win.style.color='#65c995';win.textContent='WINNER: '+m.winner;card.append(win)}col.append(card)});$('bracket').append(col)});
  let f=state.rounds.at(-1)[0];if(f?.winner){$('champion').classList.remove('hidden');$('champName').textContent=f.winner}
 }
@@ -253,6 +265,41 @@ async function persistMatches(){
  }
 }
 
+async function reportMatchWinner(r,i,name){
+ if(!sb||!tournamentId)return;
+
+ const m=state.rounds[r][i];
+ const winnerId=state.nameToId[name];
+
+ if(!winnerId){
+  message('勝者の情報が見つかりません',true);
+  return;
+ }
+
+ if(!confirm(name+' の勝利で報告しますか？'))return;
+
+ try{
+  const {data,error}=await sb.rpc('report_match_winner',{
+   p_tournament_id:tournamentId,
+   p_round_number:r+1,
+   p_match_number:i+1,
+   p_winner_id:winnerId
+  });
+
+  if(error)throw error;
+
+  if(!data?.success){
+   message(data?.message||'勝敗を登録できませんでした',true);
+   return;
+  }
+
+  message('勝敗を登録しました');
+  await refreshTournament();
+
+ }catch(e){
+  message('勝敗の登録に失敗: '+e.message,true);
+ }
+}
 async function setWinner(r,i,name){
  if(!isOwner)return;
  history.push(JSON.stringify(state));
