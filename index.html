@@ -241,8 +241,20 @@ function render(){
     card.append(line);
    });
 
-   if(m.winner){
-    let win=document.createElement('div');
+  if(m.winner){
+ let win=document.createElement('div');
+ win.className='matchmeta';
+ win.style.color='#65c995';
+ win.textContent='WINNER: '+m.winner;
+ card.append(win);
+
+ if(isOwner){
+  let undo=document.createElement('button');
+  undo.textContent='結果を取り消す';
+  undo.onclick=()=>undoMatchResult(r,i);
+  card.append(undo);
+ }
+}
     win.className='matchmeta';
     win.style.color='#65c995';
     win.textContent='WINNER: '+m.winner;
@@ -358,6 +370,55 @@ async function reportMatchWinner(r,i,name){
   message('勝敗の登録に失敗: '+e.message,true);
  }
 }
+async function undoMatchResult(r,i){
+ if(!isOwner)return;
+
+ const m=state.rounds[r][i];
+ if(!m||!m.winner)return;
+
+ if(!confirm(
+  'この試合の結果を取り消しますか？\n'+
+  '勝者：'+m.winner+'\n'+
+  '後続の試合にも影響する場合があります。'
+ ))return;
+
+ history.push(JSON.stringify(state));
+ if(history.length>20)history.shift();
+
+ // この試合の勝敗を取り消す
+ m.winner=null;
+ m.table_number=null;
+
+ // 後続ラウンドの対戦者を再計算
+ for(let rr=r+1;rr<state.rounds.length;rr++){
+  state.rounds[rr].forEach((dest,idx)=>{
+   const srcA=state.rounds[rr-1][idx*2];
+   const srcB=state.rounds[rr-1][idx*2+1];
+
+   const nextA=srcA?.winner||null;
+   const nextB=srcB?.winner||null;
+
+   // 対戦者が変わった場合、その試合結果も取り消す
+   if(dest.a!==nextA||dest.b!==nextB){
+    dest.winner=null;
+    dest.table_number=null;
+   }
+
+   dest.a=nextA;
+   dest.b=nextB;
+  });
+ }
+
+ render();
+
+ try{
+  await persistMatches();
+  await refreshTournament();
+  message('試合結果を取り消しました');
+ }catch(e){
+  message('取消の保存に失敗: '+e.message,true);
+ }
+}  
 async function setWinner(r,i,name){
  if(!isOwner)return;
  history.push(JSON.stringify(state));
